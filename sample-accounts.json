@@ -1,0 +1,240 @@
+[
+  {
+    "code": "1000",
+    "name": "Assets",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "All resources owned by the business",
+    "isHeader": true
+  },
+  {
+    "code": "1100",
+    "name": "Cash",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Cash on hand and in bank",
+    "isHeader": true,
+    "parentId": "1000"
+  },
+  {
+    "code": "1110",
+    "name": "Cash - Main Bank Account",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Primary bank account",
+    "isHeader": false,
+    "parentId": "1100"
+  },
+  {
+    "code": "1120",
+    "name": "Cash - Petty Cash",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Petty cash fund",
+    "isHeader": false,
+    "parentId": "1100"
+  },
+  {
+    "code": "1200",
+    "name": "Accounts Receivable",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Amounts owed by customers",
+    "isHeader": true,
+    "parentId": "1000"
+  },
+  {
+    "code": "1210",
+    "name": "Accounts Receivable - Domestic",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Domestic customers",
+    "isHeader": false,
+    "parentId": "1200"
+  },
+  {
+    "code": "1220",
+    "name": "Accounts Receivable - International",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "International customers",
+    "isHeader": false,
+    "parentId": "1200"
+  },
+  {
+    "code": "1300",
+    "name": "Inventory",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Goods held for sale",
+    "isHeader": false,
+    "parentId": "1000"
+  },
+  {
+    "code": "1400",
+    "name": "Prepaid Expenses",
+    "type": "asset",
+    "normalBalance": "debit",
+    "description": "Expenses paid in advance",
+    "isHeader": false,
+    "parentId": "1000"
+  },
+  {
+    "code": "2000",
+    "name": "Liabilities",
+    "type": "liability",
+    "normalBalance": "credit",
+    "description": "Obligations owed to others",
+    "isHeader": true
+  },
+  {
+    "code": "2100",
+    "name": "Accounts Payable",
+    "type": "liability",
+    "normalBalance": "credit",
+    "description": "Amounts owed to suppliers",
+    "isHeader": false,
+    "parentId": "2000"
+  },
+  {
+    "code": "2200",
+    "name": "Short-term Loans",
+    "type": "liability",
+    "normalBalance": "credit",
+    "description": "Loans payable within 12 months",
+    "isHeader": false,
+    "parentId": "2000"
+  },
+  {
+    "code": "2300",
+    "name": "Long-term Loans",
+    "type": "liability",
+    "normalBalance": "credit",
+    "description": "Loans payable after 12 months",
+    "isHeader": false,
+    "parentId": "2000"
+  },
+  {
+    "code": "3000",
+    "name": "Equity",
+    "type": "equity",
+    "normalBalance": "credit",
+    "description": "Owner's interest in the business",
+    "isHeader": true
+  },
+  {
+    "code": "3100",
+    "name": "Owner's Capital",
+    "type": "equity",
+    "normalBalance": "credit",
+    "description": "Owner investments",
+    "isHeader": false,
+    "parentId": "3000"
+  },
+  {
+    "code": "3200",
+    "name": "Retained Earnings",
+    "type": "equity",
+    "normalBalance": "credit",
+    "description": "Accumulated profits",
+    "isHeader": false,
+    "parentId": "3000"
+  },
+  {
+    "code": "4000",
+    "name": "Revenue",
+    "type": "revenue",
+    "normalBalance": "credit",
+    "description": "Income from business operations",
+    "isHeader": true
+  },
+  {
+    "code": "4100",
+    "name": "Sales Revenue",
+    "type": "revenue",
+    "normalBalance": "credit",
+    "description": "Income from product sales",
+    "isHeader": false,
+    "parentId": "4000"
+  },
+  {
+    "code": "4200",
+    "name": "Service Revenue",
+    "type": "revenue",
+    "normalBalance": "credit",
+    "description": "Income from services rendered",
+    "isHeader": false,
+    "parentId": "4000"
+  },
+  {
+    "code": "5000",
+    "name": "Expenses",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Costs incurred in running the business",
+    "isHeader": true
+  },
+  {
+    "code": "5100",
+    "name": "Cost of Goods Sold",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Direct costs of products sold",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5200",
+    "name": "Salaries Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Employee salaries and wages",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5300",
+    "name": "Rent Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Office or facility rent",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5400",
+    "name": "Utilities Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Electricity, water, internet, etc.",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5500",
+    "name": "Office Supplies Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Office stationery and supplies",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5600",
+    "name": "Marketing Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Advertising and promotion costs",
+    "isHeader": false,
+    "parentId": "5000"
+  },
+  {
+    "code": "5700",
+    "name": "Insurance Expense",
+    "type": "expense",
+    "normalBalance": "debit",
+    "description": "Business insurance costs",
+    "isHeader": false,
+    "parentId": "5000"
+  }
+]
