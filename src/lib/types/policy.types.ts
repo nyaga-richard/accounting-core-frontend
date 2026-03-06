@@ -7,7 +7,8 @@ export enum BusinessEventType {
   BILL_CREATED = 'bill.created',
   GOODS_RECEIVED = 'goods.received',
   PERIOD_CLOSING = 'period.closing',
-  CUSTOM_EVENT = 'custom.event'
+  CUSTOM_EVENT = 'custom.event',
+  EXPENSE_RECORDED = "EXPENSE_RECORDED"
 }
 
 export enum ConditionOperator {
@@ -52,6 +53,8 @@ export interface Condition {
 }
 
 export interface Action {
+  referenceTemplate: any;
+  id: any;
   type: ActionType;
   // Accounting action specific fields
   debitAccount?: AccountRule;

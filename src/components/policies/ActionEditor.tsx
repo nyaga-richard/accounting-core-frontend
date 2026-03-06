@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ActionType } from '@/lib/types/policy.types';
+import { Account } from '@/lib/types/account.types'; // Add this import
 import { AccountSelector } from '../accounts/AccountSelector';
 
 const actionSchema = z.object({
@@ -58,14 +59,15 @@ type ActionFormData = z.infer<typeof actionSchema>;
 
 interface ActionEditorProps {
   data: any;
+  accounts?: Account[]; // Add this prop
   onChange: (data: Partial<ActionFormData>) => void;
 }
 
-export function ActionEditor({ data, onChange }: ActionEditorProps) {
+export function ActionEditor({ data, accounts = [], onChange }: ActionEditorProps) {
   const form = useForm<ActionFormData>({
     resolver: zodResolver(actionSchema),
     defaultValues: {
-      type: data.actionType || ActionType.CREATE_LEDGER_ENTRY,
+      type: data.actionType || data.type || ActionType.CREATE_LEDGER_ENTRY,
       ...data,
     },
   });
@@ -133,6 +135,7 @@ export function ActionEditor({ data, onChange }: ActionEditorProps) {
 
               {form.watch('debitAccount.type') === 'fixed' && (
                 <AccountSelector
+                  accounts={accounts} // Pass accounts here
                   onSelect={(account) => 
                     form.setValue('debitAccount.fixedAccountId', account.id)
                   }
@@ -156,7 +159,51 @@ export function ActionEditor({ data, onChange }: ActionEditorProps) {
             </TabsContent>
 
             <TabsContent value="credit" className="space-y-4">
-              {/* Similar to debit tab */}
+              <FormField
+                control={form.control}
+                name="creditAccount.type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Selection</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="fixed">Fixed Account</SelectItem>
+                        <SelectItem value="fromContext">From Context</SelectItem>
+                        <SelectItem value="expression">Expression</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('creditAccount.type') === 'fixed' && (
+                <AccountSelector
+                  accounts={accounts} // Pass accounts here
+                  onSelect={(account) => 
+                    form.setValue('creditAccount.fixedAccountId', account.id)
+                  }
+                />
+              )}
+
+              {form.watch('creditAccount.type') === 'fromContext' && (
+                <FormField
+                  control={form.control}
+                  name="creditAccount.contextPath"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Context Path</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., data.accountCode" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="amount" className="space-y-4">
@@ -197,6 +244,72 @@ export function ActionEditor({ data, onChange }: ActionEditorProps) {
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value))}
                         />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {form.watch('amount.type') === 'fromContext' && (
+                <FormField
+                  control={form.control}
+                  name="amount.contextPath"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Context Path</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., data.amount" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {form.watch('amount.type') === 'percentage' && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="amount.percentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Percentage</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            min="0" 
+                            max="100"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amount.percentageOf"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Percentage Of</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., data.total" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
+              {form.watch('amount.type') === 'formula' && (
+                <FormField
+                  control={form.control}
+                  name="amount.formula"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Formula</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., data.amount * 1.1" {...field} />
                       </FormControl>
                     </FormItem>
                   )}

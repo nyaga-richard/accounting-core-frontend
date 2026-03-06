@@ -28,6 +28,7 @@ export interface Account {
   level: number;
   path: string;
   children?: Account[];
+  metadata?: Record<string, any>;
 }
 
 export interface AccountStructure {

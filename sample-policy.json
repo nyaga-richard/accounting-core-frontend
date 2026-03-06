@@ -1,0 +1,1132 @@
+[
+  {
+    "name": "Revenue Recognition - Cash Basis",
+    "description": "Recognize revenue when cash is received",
+    "eventType": "payment.received",
+    "priority": 100,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "payment.amount",
+        "operator": "greaterThan",
+        "value": 0
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Create revenue entry from cash payment",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cash-account-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "revenue-account-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "payment.amount"
+        },
+        "descriptionTemplate": "Revenue from payment {{payment.reference}}",
+        "referenceTemplate": "REV-{{payment.id}}"
+      }
+    ],
+    "tags": ["revenue", "cash-basis", "automation"],
+    "config": {
+      "requiresApproval": false,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Revenue Recognition - Accrual Basis",
+    "description": "Recognize revenue when invoice is created",
+    "eventType": "invoice.created",
+    "priority": 100,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "invoice.status",
+        "operator": "equals",
+        "value": "approved"
+      },
+      {
+        "id": "cond_2",
+        "field": "invoice.type",
+        "operator": "equals",
+        "value": "service"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Create accounts receivable and revenue",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "service-revenue-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "invoice.total"
+        },
+        "descriptionTemplate": "Service revenue from invoice {{invoice.number}} - {{invoice.customerName}}",
+        "referenceTemplate": "INV-{{invoice.number}}"
+      }
+    ],
+    "tags": ["revenue", "accrual-basis", "automation", "invoicing"],
+    "config": {
+      "requiresApproval": false,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Deferred Revenue - Annual Subscription",
+    "description": "Defer revenue for annual subscriptions",
+    "eventType": "subscription.created",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "subscription.billingPeriod",
+        "operator": "equals",
+        "value": "annual"
+      },
+      {
+        "id": "cond_2",
+        "field": "subscription.status",
+        "operator": "equals",
+        "value": "active"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record payment and deferred revenue",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cash-account-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "deferred-revenue-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "subscription.amount"
+        },
+        "descriptionTemplate": "Annual subscription - {{subscription.customerName}} - {{subscription.plan}}",
+        "referenceTemplate": "SUB-{{subscription.id}}"
+      },
+      {
+        "id": "action_2",
+        "type": "SCHEDULE_RECURRING",
+        "description": "Schedule monthly revenue recognition",
+        "scheduleType": "monthly",
+        "startDate": "{{subscription.startDate}}",
+        "durationMonths": 12,
+        "actions": [
+          {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "deferred-revenue-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "subscription-revenue-id"
+            },
+            "amount": {
+              "type": "formula",
+              "formula": "{{subscription.amount}} / 12",
+              "rounding": "nearest",
+              "precision": 2
+            },
+            "descriptionTemplate": "Monthly revenue recognition - {{subscription.customerName}} - Month {{recurring.month}}",
+            "referenceTemplate": "SUB-{{subscription.id}}-M{{recurring.month}}"
+          }
+        ]
+      }
+    ],
+    "tags": ["revenue", "deferred-revenue", "subscription", "saas", "recurring"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false,
+      "maxRetries": 3
+    }
+  },
+  {
+    "name": "Expense Recognition - Bill Received",
+    "description": "Record expense when bill is received",
+    "eventType": "bill.received",
+    "priority": 100,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "bill.status",
+        "operator": "equals",
+        "value": "approved"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record expense and accounts payable",
+        "debitAccount": {
+          "type": "dynamic",
+          "lookup": {
+            "type": "category",
+            "source": "bill.category",
+            "mapping": {
+              "office_supplies": "office-supplies-expense-id",
+              "utilities": "utilities-expense-id",
+              "rent": "rent-expense-id",
+              "consulting": "consulting-expense-id",
+              "software": "software-expense-id",
+              "default": "other-expense-id"
+            }
+          }
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-payable-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "bill.amount"
+        },
+        "descriptionTemplate": "Bill from {{bill.vendorName}} - {{bill.number}} - {{bill.category}}",
+        "referenceTemplate": "BILL-{{bill.number}}"
+      }
+    ],
+    "tags": ["expenses", "accounts-payable", "bills", "accrual"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Payment Processing - Credit Card Fees",
+    "description": "Record credit card payment with fee deduction",
+    "eventType": "payment.processed",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "payment.method",
+        "operator": "equals",
+        "value": "credit_card"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record net payment after fees",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cash-account-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "{{payment.amount}} - ({{payment.amount}} * {{payment.feePercentage}} / 100) - {{payment.feeFixed}}",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "Credit card payment - {{payment.customerName}} - Invoice {{payment.invoiceNumber}}",
+        "referenceTemplate": "PMT-{{payment.id}}"
+      },
+      {
+        "id": "action_2",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record credit card processing fees",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "credit-card-fees-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cash-account-id"
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "({{payment.amount}} * {{payment.feePercentage}} / 100) + {{payment.feeFixed}}",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "Credit card processing fees - {{payment.reference}}",
+        "referenceTemplate": "FEE-{{payment.id}}"
+      }
+    ],
+    "tags": ["payments", "credit-card", "fees", "accounts-receivable"],
+    "config": {
+      "requiresApproval": false,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Monthly Depreciation - Straight Line",
+    "description": "Calculate and post monthly depreciation",
+    "eventType": "period.closing",
+    "priority": 50,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "BATCH_PROCESS",
+        "description": "Process depreciation for all assets",
+        "batchType": "assets",
+        "filter": {
+          "status": "active",
+          "depreciationMethod": "straight-line"
+        },
+        "forEach": {
+          "action": {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "depreciation-expense-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "accumulated-depreciation-id"
+            },
+            "amount": {
+              "type": "formula",
+              "formula": "{{asset.cost}} / {{asset.usefulLife}} / 12",
+              "rounding": "nearest",
+              "precision": 2
+            },
+            "descriptionTemplate": "Monthly depreciation - {{asset.name}} - {{period.name}}",
+            "referenceTemplate": "DEP-{{asset.id}}-{{period.id}}"
+          }
+        }
+      }
+    ],
+    "tags": ["depreciation", "fixed-assets", "monthly", "scheduled"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false,
+      "schedule": "0 0 1 * *"
+    }
+  },
+  {
+    "name": "Payroll Accrual - Month End",
+    "description": "Accrue salaries at month end",
+    "eventType": "period.closing",
+    "priority": 50,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      },
+      {
+        "id": "cond_2",
+        "field": "period.isLastDay",
+        "operator": "equals",
+        "value": true
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Accrue salaries for the month",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "salary-expense-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accrued-salaries-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "payroll.totalSalaries"
+        },
+        "descriptionTemplate": "Salary accrual - {{period.name}}",
+        "referenceTemplate": "PAY-{{period.id}}"
+      },
+      {
+        "id": "action_2",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Accrue payroll taxes",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "payroll-tax-expense-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "payroll-tax-payable-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "payroll.totalTaxes"
+        },
+        "descriptionTemplate": "Payroll tax accrual - {{period.name}}",
+        "referenceTemplate": "TAX-{{period.id}}"
+      }
+    ],
+    "tags": ["payroll", "accrual", "salaries", "monthly", "taxes"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Prepaid Insurance Amortization",
+    "description": "Amortize prepaid insurance monthly",
+    "eventType": "period.closing",
+    "priority": 50,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "BATCH_PROCESS",
+        "description": "Amortize all active prepaid insurance policies",
+        "batchType": "prepaidItems",
+        "filter": {
+          "type": "insurance",
+          "status": "active"
+        },
+        "forEach": {
+          "action": {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "insurance-expense-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "prepaid-insurance-id"
+            },
+            "amount": {
+              "type": "formula",
+              "formula": "{{item.totalAmount}} / {{item.termMonths}}",
+              "rounding": "nearest",
+              "precision": 2
+            },
+            "descriptionTemplate": "Insurance amortization - {{item.policyName}} - {{period.name}}",
+            "referenceTemplate": "AMORT-{{item.id}}-{{period.id}}"
+          }
+        }
+      }
+    ],
+    "tags": ["prepaid", "amortization", "insurance", "monthly"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Inventory Adjustment - Write Down",
+    "description": "Record inventory write-downs",
+    "eventType": "inventory.adjusted",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "adjustment.type",
+        "operator": "equals",
+        "value": "write_down"
+      },
+      {
+        "id": "cond_2",
+        "field": "adjustment.amount",
+        "operator": "greaterThan",
+        "value": 0
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record inventory write-down",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "inventory-write-down-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "inventory-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "adjustment.amount"
+        },
+        "descriptionTemplate": "Inventory write-down - {{adjustment.productName}} - Reason: {{adjustment.reason}}",
+        "referenceTemplate": "ADJ-{{adjustment.id}}"
+      }
+    ],
+    "tags": ["inventory", "write-down", "adjustments", "cogs"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Bad Debt Provision - Percentage of Sales",
+    "description": "Calculate and record bad debt provision",
+    "eventType": "period.closing",
+    "priority": 50,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record bad debt provision",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "bad-debt-expense-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "allowance-doubtful-accounts-id"
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "{{period.creditSales}} * 0.025",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "Bad debt provision - {{period.name}} - 2.5% of credit sales",
+        "referenceTemplate": "PROV-{{period.id}}"
+      }
+    ],
+    "tags": ["bad-debt", "provision", "accounts-receivable", "monthly"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Foreign Exchange Revaluation",
+    "description": "Revalue foreign currency balances at period end",
+    "eventType": "period.closing",
+    "priority": 40,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "BATCH_PROCESS",
+        "description": "Revalue all foreign currency accounts",
+        "batchType": "accounts",
+        "filter": {
+          "currency": "{{period.functionalCurrency}}",
+          "operator": "notEquals"
+        },
+        "forEach": {
+          "action": {
+            "type": "CONDITIONAL",
+            "conditions": [
+              {
+                "field": "revaluation.gain",
+                "operator": "greaterThan",
+                "value": 0
+              }
+            ],
+            "trueAction": {
+              "type": "CREATE_LEDGER_ENTRY",
+              "debitAccount": {
+                "type": "fixed",
+                "fixedAccountId": "{{account.id}}"
+              },
+              "creditAccount": {
+                "type": "fixed",
+                "fixedAccountId": "fx-gain-id"
+              },
+              "amount": {
+                "type": "context",
+                "contextPath": "revaluation.gain"
+              },
+              "descriptionTemplate": "FX gain - {{account.code}} {{account.currency}} - {{period.name}}",
+              "referenceTemplate": "FX-{{account.id}}-{{period.id}}"
+            },
+            "falseAction": {
+              "type": "CREATE_LEDGER_ENTRY",
+              "debitAccount": {
+                "type": "fixed",
+                "fixedAccountId": "fx-loss-id"
+              },
+              "creditAccount": {
+                "type": "fixed",
+                "fixedAccountId": "{{account.id}}"
+              },
+              "amount": {
+                "type": "context",
+                "contextPath": "revaluation.loss"
+              },
+              "descriptionTemplate": "FX loss - {{account.code}} {{account.currency}} - {{period.name}}",
+              "referenceTemplate": "FX-{{account.id}}-{{period.id}}"
+            }
+          }
+        }
+      }
+    ],
+    "tags": ["fx", "forex", "revaluation", "multi-currency", "monthly"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Inter-Company Elimination - Consolidation",
+    "description": "Eliminate inter-company transactions during consolidation",
+    "eventType": "consolidation.start",
+    "priority": 10,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "consolidation.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Eliminate inter-company receivables/payables",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "intercompany-elimination-debit-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "intercompany-elimination-credit-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "consolidation.intercompanyBalance"
+        },
+        "descriptionTemplate": "Elimination of inter-company balances - {{consolidation.period}}",
+        "referenceTemplate": "ELIM-{{consolidation.id}}-BAL"
+      },
+      {
+        "id": "action_2",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Eliminate inter-company revenue/expenses",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "intercompany-revenue-elimination-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "intercompany-expense-elimination-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "consolidation.intercompanyTransactions"
+        },
+        "descriptionTemplate": "Elimination of inter-company transactions - {{consolidation.period}}",
+        "referenceTemplate": "ELIM-{{consolidation.id}}-TRX"
+      }
+    ],
+    "tags": ["consolidation", "inter-company", "elimination", "group"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Sales Tax Calculation - US Multi-State",
+    "description": "Calculate and record sales tax for US transactions",
+    "eventType": "invoice.created",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "invoice.country",
+        "operator": "equals",
+        "value": "US"
+      },
+      {
+        "id": "cond_2",
+        "field": "invoice.state",
+        "operator": "notEquals",
+        "value": null
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record sales tax liability",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "creditAccount": {
+          "type": "dynamic",
+          "lookup": {
+            "type": "taxRate",
+            "source": "invoice.state",
+            "mapping": "sales-tax-payable-mapping"
+          }
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "{{invoice.subtotal}} * ({{taxRate}} / 100)",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "Sales tax - {{invoice.state}} - {{taxRate}}% - Invoice {{invoice.number}}",
+        "referenceTemplate": "TAX-{{invoice.number}}",
+        "metadata": {
+          "taxRate": "{{taxRate}}",
+          "taxableAmount": "{{invoice.subtotal}}",
+          "taxJurisdiction": "{{invoice.state}}"
+        }
+      }
+    ],
+    "tags": ["tax", "sales-tax", "us", "compliance", "multi-state"],
+    "config": {
+      "requiresApproval": false,
+      "runOnce": true,
+      "taxConfig": {
+        "taxInclusive": false,
+        "taxOnShipping": true,
+        "nexusStates": ["CA", "NY", "TX", "FL", "IL"]
+      }
+    }
+  },
+  {
+    "name": "VAT Calculation - EU Reverse Charge",
+    "description": "Handle VAT with reverse charge for EU B2B transactions",
+    "eventType": "invoice.created",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "invoice.country",
+        "operator": "in",
+        "value": ["GB", "DE", "FR", "IT", "ES", "NL", "BE", "IE"]
+      },
+      {
+        "id": "cond_2",
+        "field": "invoice.customerType",
+        "operator": "equals",
+        "value": "business"
+      },
+      {
+        "id": "cond_3",
+        "field": "invoice.hasVATNumber",
+        "operator": "equals",
+        "value": true
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record revenue (no VAT - reverse charge)",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "revenue-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "invoice.subtotal"
+        },
+        "descriptionTemplate": "EU B2B sale - Reverse charge - {{invoice.customerName}} - {{invoice.country}}",
+        "referenceTemplate": "INV-{{invoice.number}}",
+        "metadata": {
+          "customerVATNumber": "{{invoice.vatNumber}}",
+          "reverseCharge": true,
+          "taxPoint": "{{invoice.date}}"
+        }
+      },
+      {
+        "id": "action_2",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record VAT on purchase (if applicable)",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "vat-recoverable-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "vat-payable-id"
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "{{invoice.subtotal}} * ({{vatRate}} / 100)",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "VAT reverse charge - {{invoice.country}} - {{vatRate}}%",
+        "referenceTemplate": "VAT-{{invoice.number}}"
+      }
+    ],
+    "tags": ["vat", "eu", "reverse-charge", "b2b", "compliance"],
+    "config": {
+      "requiresApproval": false,
+      "runOnce": true,
+      "validateVATNumber": true
+    }
+  },
+  {
+    "name": "Dividend Declaration and Payment",
+    "description": "Record dividend declaration and subsequent payment",
+    "eventType": "dividend.declared",
+    "priority": 80,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "dividend.status",
+        "operator": "equals",
+        "value": "approved"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record dividend declaration",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "retained-earnings-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "dividends-payable-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "dividend.totalAmount"
+        },
+        "descriptionTemplate": "Dividend declared - {{dividend.date}} - ${{dividend.perShare}} per share",
+        "referenceTemplate": "DIV-{{dividend.id}}-DEC"
+      },
+      {
+        "id": "action_2",
+        "type": "SCHEDULE_ACTION",
+        "description": "Schedule dividend payment",
+        "scheduleDate": "{{dividend.paymentDate}}",
+        "action": {
+          "type": "CREATE_LEDGER_ENTRY",
+          "debitAccount": {
+            "type": "fixed",
+            "fixedAccountId": "dividends-payable-id"
+          },
+          "creditAccount": {
+            "type": "fixed",
+            "fixedAccountId": "cash-account-id"
+          },
+          "amount": {
+            "type": "context",
+            "contextPath": "dividend.totalAmount"
+          },
+          "descriptionTemplate": "Dividend payment - {{dividend.date}}",
+          "referenceTemplate": "DIV-{{dividend.id}}-PMT"
+        }
+      }
+    ],
+    "tags": ["equity", "dividends", "shareholders", "distribution"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true
+    }
+  },
+  {
+    "name": "Stock Option Expense Recognition",
+    "description": "Record share-based compensation expense",
+    "eventType": "period.closing",
+    "priority": 50,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "period.type",
+        "operator": "equals",
+        "value": "monthly"
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "BATCH_PROCESS",
+        "description": "Calculate and record stock option expense",
+        "batchType": "stockOptions",
+        "filter": {
+          "status": "vesting",
+          "vestingStartDate": "{{period.startDate}}",
+          "operator": "lessThanOrEqual"
+        },
+        "forEach": {
+          "action": {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "stock-compensation-expense-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "additional-paid-in-capital-id"
+            },
+            "amount": {
+              "type": "formula",
+              "formula": "({{option.grantedOptions}} * {{option.fairValue}}) / {{option.vestingPeriodMonths}}",
+              "rounding": "nearest",
+              "precision": 2
+            },
+            "descriptionTemplate": "Stock option expense - {{option.grantDate}} - {{option.employeeName}}",
+            "referenceTemplate": "STK-{{option.id}}-{{period.id}}"
+          }
+        }
+      }
+    ],
+    "tags": ["equity", "stock-options", "compensation", "vesting"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": false
+    }
+  },
+  {
+    "name": "Lease Liability - IFRS 16 Recognition",
+    "description": "Record right-of-use asset and lease liability",
+    "eventType": "lease.signed",
+    "priority": 80,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "lease.type",
+        "operator": "in",
+        "value": ["operating", "finance"]
+      },
+      {
+        "id": "cond_2",
+        "field": "lease.term",
+        "operator": "greaterThan",
+        "value": 12
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record ROU asset and lease liability",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "right-of-use-asset-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "lease-liability-id"
+        },
+        "amount": {
+          "type": "formula",
+          "formula": "{{lease.presentValue}}",
+          "rounding": "nearest",
+          "precision": 2
+        },
+        "descriptionTemplate": "ROU asset and lease liability - {{lease.assetName}} - {{lease.term}} months",
+        "referenceTemplate": "LEASE-{{lease.id}}-INIT"
+      },
+      {
+        "id": "action_2",
+        "type": "SCHEDULE_RECURRING",
+        "description": "Schedule monthly lease payments",
+        "scheduleType": "monthly",
+        "startDate": "{{lease.startDate}}",
+        "durationMonths": "{{lease.term}}",
+        "actions": [
+          {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "lease-liability-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "cash-account-id"
+            },
+            "amount": {
+              "type": "context",
+              "contextPath": "lease.monthlyPayment"
+            },
+            "descriptionTemplate": "Lease payment - {{lease.assetName}} - Month {{recurring.month}}",
+            "referenceTemplate": "LEASE-{{lease.id}}-PMT-{{recurring.month}}"
+          },
+          {
+            "type": "CREATE_LEDGER_ENTRY",
+            "debitAccount": {
+              "type": "fixed",
+              "fixedAccountId": "interest-expense-id"
+            },
+            "creditAccount": {
+              "type": "fixed",
+              "fixedAccountId": "lease-liability-id"
+            },
+            "amount": {
+              "type": "formula",
+              "formula": "{{lease.outstandingBalance}} * ({{lease.interestRate}} / 12 / 100)",
+              "rounding": "nearest",
+              "precision": 2
+            },
+            "descriptionTemplate": "Lease interest - {{lease.assetName}} - Month {{recurring.month}}",
+            "referenceTemplate": "LEASE-{{lease.id}}-INT-{{recurring.month}}"
+          }
+        ]
+      }
+    ],
+    "tags": ["leases", "ifrs16", "asc842", "assets", "liabilities"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true,
+      "amortizationSchedule": true
+    }
+  },
+  {
+    "name": "Customer Refund Processing",
+    "description": "Handle customer refunds and reverse revenue",
+    "eventType": "refund.processed",
+    "priority": 90,
+    "isActive": true,
+    "conditions": [
+      {
+        "id": "cond_1",
+        "field": "refund.status",
+        "operator": "equals",
+        "value": "approved"
+      },
+      {
+        "id": "cond_2",
+        "field": "refund.amount",
+        "operator": "greaterThan",
+        "value": 0
+      }
+    ],
+    "actions": [
+      {
+        "id": "action_1",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Reverse original revenue",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "revenue-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "refund.amount"
+        },
+        "descriptionTemplate": "Revenue reversal - Refund {{refund.number}} - {{refund.customerName}}",
+        "referenceTemplate": "REF-{{refund.id}}-REV"
+      },
+      {
+        "id": "action_2",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Record refund payment",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "accounts-receivable-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cash-account-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "refund.amount"
+        },
+        "descriptionTemplate": "Refund payment - {{refund.number}} - {{refund.customerName}}",
+        "referenceTemplate": "REF-{{refund.id}}-PMT"
+      },
+      {
+        "id": "action_3",
+        "type": "CREATE_LEDGER_ENTRY",
+        "description": "Reverse COGS if applicable",
+        "debitAccount": {
+          "type": "fixed",
+          "fixedAccountId": "inventory-id"
+        },
+        "creditAccount": {
+          "type": "fixed",
+          "fixedAccountId": "cogs-id"
+        },
+        "amount": {
+          "type": "context",
+          "contextPath": "refund.cogsAmount"
+        },
+        "descriptionTemplate": "COGS reversal - Refund {{refund.number}}",
+        "referenceTemplate": "REF-{{refund.id}}-COGS",
+        "condition": {
+          "field": "refund.productReturned",
+          "operator": "equals",
+          "value": true
+        }
+      }
+    ],
+    "tags": ["refunds", "revenue", "customer-service", "adjustments"],
+    "config": {
+      "requiresApproval": true,
+      "runOnce": true,
+      "restockInventory": true
+    }
+  }
+]

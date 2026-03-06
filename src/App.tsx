@@ -5,7 +5,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import  Dashboard  from '@/app/Dashboard/page';
+import  Dashboard  from '@/app/dashboard/page';
 //import { Policies } from '@/pages/Policies';
 import { PolicyEditor } from './pages/PolicyEditor';
 import { Toaster } from './components/ui/sonner';

@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -43,17 +42,17 @@ import { Account, AccountType, NormalBalance } from '@/lib/types/account.types';
 import { accountsApi } from '@/lib/api/accounts';
 import { cn } from '@/lib/utils';
 
-// Form validation schema - fixed enum syntax
+// Form validation schema
 export const accountSchema = z.object({
   code: z
     .string()
     .min(1, "Account code is required")
-    .max(20),
+    .max(20, "Account code must be 20 characters or less"),
 
   name: z
     .string()
     .min(1, "Account name is required")
-    .max(100),
+    .max(100, "Account name must be 100 characters or less"),
 
   type: z.enum([
     "asset",
@@ -73,8 +72,9 @@ export const accountSchema = z.object({
 
   isActive: z.boolean(),
 
-  metadata: z.record(z.string(), z.any()),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
+
 // Infer the type from the schema
 export type AccountFormData = z.infer<typeof accountSchema>;
 
@@ -101,20 +101,19 @@ export function AccountForm({
 
   // Initialize form with proper default values
   const form = useForm<AccountFormData>({
-  resolver: zodResolver(accountSchema),
-
-  defaultValues: {
-    code: "",
-    name: "",
-    type: "asset",
-    normalBalance: "debit" as NormalBalance,
-    description: "",
-    isHeader: false,
-    parentId: null,
-    isActive: true,
-    metadata: {},
-  },
-});
+    resolver: zodResolver(accountSchema),
+    defaultValues: {
+      code: initialData?.code || "",
+      name: initialData?.name || "",
+      type: (initialData?.type as AccountType) || "asset",
+      normalBalance: (initialData?.normalBalance as NormalBalance) || "debit",
+      description: initialData?.description || "",
+      isHeader: initialData?.isHeader || false,
+      parentId: initialData?.parentId || null,
+      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
+      metadata: initialData?.metadata || {},
+    },
+  });
 
   // Watch form values for real-time validation
   const watchedCode = form.watch('code');
@@ -136,8 +135,9 @@ export function AccountForm({
       }
 
       try {
-        const existing = await accountsApi.getByCode(watchedCode);
-        if (existing.data) {
+        const response = await accountsApi.getByCode(watchedCode);
+        // Check if account exists in response
+        if (response?.data) {
           setValidationStatus({
             isValid: false,
             message: 'Account code already exists',
@@ -182,9 +182,29 @@ export function AccountForm({
     setLoadingAccounts(true);
     try {
       const response = await accountsApi.list({ isActive: true });
-      setAccounts(response.data);
+      
+      // Handle different response structures
+      let accountsData: Account[] = [];
+      
+      if (response && typeof response === 'object') {
+        // If response has a data property that's an array
+        if (response.data && Array.isArray(response.data)) {
+          accountsData = response.data;
+        }
+        // If response itself is an array
+        else if (Array.isArray(response)) {
+          accountsData = response;
+        }
+        // If response has a data property with items
+        else if (response.data && response.data.items && Array.isArray(response.data.items)) {
+          accountsData = response.data.items;
+        }
+      }
+      
+      setAccounts(accountsData);
     } catch (error) {
       console.error('Failed to load accounts:', error);
+      setAccounts([]); // Set empty array on error
     } finally {
       setLoadingAccounts(false);
     }
@@ -196,11 +216,17 @@ export function AccountForm({
       await onSubmit(data);
     } catch (error) {
       // Error is handled by parent
+      console.error('Form submission error:', error);
     }
   };
 
   // Get available parent accounts
   const getAvailableParents = () => {
+    // Add safety check for accounts array
+    if (!accounts || !Array.isArray(accounts)) {
+      return [];
+    }
+    
     return accounts.filter(account => {
       // Can't parent to itself
       if (account.id === initialData?.id) return false;
@@ -228,31 +254,31 @@ export function AccountForm({
   };
 
   // Get normal balance explanation
-    const normalBalanceRules = {
+  const normalBalanceRules = {
     asset: "debit",
     liability: "credit",
     equity: "credit",
     revenue: "credit",
     expense: "debit",
-    } as const;
+  } as const;
 
-    const getNormalBalanceHelp = (type: AccountType, balance: NormalBalance): string => {
+  const getNormalBalanceHelp = (type: AccountType, balance: NormalBalance): string => {
     const expected = normalBalanceRules[type];
 
     if (balance !== expected) {
-        return `Warning: ${type} accounts typically have a ${expected} normal balance`;
+      return `Warning: ${type} accounts typically have a ${expected} normal balance`;
     }
 
     return `Correct: ${type} accounts normally have a ${expected} balance`;
-    };
+  };
 
   const parentAccounts = getAvailableParents();
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 min-w-[400px]">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between ">
           <div>
             <h2 className="text-lg font-semibold">
               {initialData?.id ? 'Edit Account' : 'Create New Account'}
@@ -383,63 +409,156 @@ export function AccountForm({
             />
           </div>
 
-            {/* Right Column */}
-            <div className="space-y-4">
+          {/* Right Column */}
+          <div className="space-y-4">
             {/* Normal Balance */}
             <FormField
-                control={form.control}
-                name="normalBalance"
-                render={({ field }) => (
+              control={form.control}
+              name="normalBalance"
+              render={({ field }) => (
                 <FormItem>
-                    <FormLabel className="flex items-center">
+                  <FormLabel className="flex items-center">
                     Normal Balance
                     <span className="text-red-500 ml-1">*</span>
-                    </FormLabel>
+                  </FormLabel>
 
-                    <Select
+                  <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     disabled={isLoading}
-                    >
+                  >
                     <FormControl>
-                        <SelectTrigger>
+                      <SelectTrigger>
                         <SelectValue placeholder="Select normal balance" />
-                        </SelectTrigger>
+                      </SelectTrigger>
                     </FormControl>
 
                     <SelectContent>
-                        <SelectItem value="debit">Debit</SelectItem>
-                        <SelectItem value="credit">Credit</SelectItem>
+                      <SelectItem value="debit">Debit</SelectItem>
+                      <SelectItem value="credit">Credit</SelectItem>
                     </SelectContent>
-                    </Select>
+                  </Select>
 
-                    <FormDescription
+                  <FormDescription
                     className={cn(
-                        form.watch('type') &&
-                        field.value &&
-                        getNormalBalanceHelp(
-                            form.watch('type') as AccountType,
-                            field.value as NormalBalance
-                        ).includes('Warning')
-                        ? 'text-yellow-600'
-                        : ''
+                      form.watch('type') &&
+                      field.value &&
+                      getNormalBalanceHelp(
+                        form.watch('type') as AccountType,
+                        field.value as NormalBalance
+                      ).includes('Warning')
+                      ? 'text-yellow-600'
+                      : ''
                     )}
-                    >
+                  >
                     {form.watch('type') && field.value
-                        ? getNormalBalanceHelp(
-                            form.watch('type') as AccountType,
-                            field.value as NormalBalance
+                      ? getNormalBalanceHelp(
+                          form.watch('type') as AccountType,
+                          field.value as NormalBalance
                         )
-                        : 'Select both type and normal balance to see guidance'}
-                    </FormDescription>
+                      : 'Select both type and normal balance to see guidance'}
+                  </FormDescription>
 
-                    <FormMessage />
+                  <FormMessage />
                 </FormItem>
-                )}
+              )}
             />
-            </div>
 
-            </div>
+            {/* Is Header Switch */}
+            <FormField
+              control={form.control}
+              name="isHeader"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Header Account
+                    </FormLabel>
+                    <FormDescription>
+                      Header accounts can have child accounts but cannot be used in transactions
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <div className="flex items-center space-x-2">
+                      <span className={cn(
+                        "text-sm",
+                        !field.value ? "text-gray-500" : "text-yellow-600"
+                      )}>
+                        {field.value ? 'Yes' : 'No'}
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={field.value}
+                        onClick={() => field.onChange(!field.value)}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          field.value ? "bg-yellow-600" : "bg-gray-200"
+                        )}
+                        disabled={isLoading}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
+                            field.value ? "translate-x-6" : "translate-x-1"
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Parent Account - NEW FIELD */}
+        <FormField
+          control={form.control}
+          name="parentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Parent Account</FormLabel>
+              <Select
+                onValueChange={(value) => field.onChange(value === "null" ? null : value)}
+                defaultValue={field.value || "null"}
+                disabled={isLoading || loadingAccounts}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select parent account (optional)" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="null">None (Root Level)</SelectItem>
+                  {loadingAccounts ? (
+                    <SelectItem value="loading" disabled>
+                      Loading accounts...
+                    </SelectItem>
+                  ) : parentAccounts && parentAccounts.length > 0 ? (
+                    parentAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex items-center">
+                          <FolderOpen className="h-3 w-3 mr-2 text-yellow-600" />
+                          <span className="font-mono mr-2">{account.code}</span>
+                          {account.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-parents" disabled>
+                      No parent accounts available
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Select a parent account to create a hierarchical structure. Only header accounts can be parents.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Description */}
         <FormField
@@ -454,6 +573,7 @@ export function AccountForm({
                   className="resize-none"
                   rows={3}
                   {...field}
+                  value={field.value || ''}
                 />
               </FormControl>
               <FormDescription>
@@ -484,11 +604,11 @@ export function AccountForm({
                 <p className="text-gray-500">Type</p>
                 {form.watch('type') && (
                   <Badge variant="outline" className={cn(
-                    form.watch('type') === 'asset' && 'bg-green-50 text-green-700',
-                    form.watch('type') === 'liability' && 'bg-red-50 text-red-700',
-                    form.watch('type') === 'equity' && 'bg-purple-50 text-purple-700',
-                    form.watch('type') === 'revenue' && 'bg-blue-50 text-blue-700',
-                    form.watch('type') === 'expense' && 'bg-orange-50 text-orange-700',
+                    form.watch('type') === 'asset' && 'bg-green-50 text-green-700 border-green-200',
+                    form.watch('type') === 'liability' && 'bg-red-50 text-red-700 border-red-200',
+                    form.watch('type') === 'equity' && 'bg-purple-50 text-purple-700 border-purple-200',
+                    form.watch('type') === 'revenue' && 'bg-blue-50 text-blue-700 border-blue-200',
+                    form.watch('type') === 'expense' && 'bg-orange-50 text-orange-700 border-orange-200',
                   )}>
                     {form.watch('type')}
                   </Badge>
@@ -536,22 +656,22 @@ export function AccountForm({
             <X className="mr-2 h-4 w-4" />
             Cancel
           </Button>
-            <Button 
+          <Button 
             type="submit" 
             disabled={isLoading || validationStatus?.isValid === false}
-            >
+          >
             {isLoading ? (
-                <>
+              <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
-                </>
+              </>
             ) : (
-                <>
+              <>
                 <Save className="mr-2 h-4 w-4" />
                 {initialData?.id ? 'Update Account' : 'Create Account'}
-                </>
+              </>
             )}
-            </Button>
+          </Button>
         </div>
       </form>
     </Form>

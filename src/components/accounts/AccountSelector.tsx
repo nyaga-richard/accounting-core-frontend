@@ -24,6 +24,7 @@ import { Account, AccountType } from '@/lib/types/account.types';
 import { cn } from '@/lib/utils';
 
 interface AccountSelectorProps {
+  accounts?: Account[]; // Add this prop
   onSelect: (account: Account) => void;
   selectedAccountId?: string;
   filterTypes?: AccountType[];
@@ -32,6 +33,7 @@ interface AccountSelectorProps {
 }
 
 export function AccountSelector({ 
+  accounts: propAccounts, // Rename to avoid conflict with state
   onSelect, 
   selectedAccountId,
   filterTypes,
@@ -39,18 +41,31 @@ export function AccountSelector({
   buttonText = 'Select Account'
 }: AccountSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [internalAccounts, setInternalAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
-  // Fetch accounts
+  // Use provided accounts if available, otherwise fetch
+  const accounts = propAccounts || internalAccounts;
+
+  // Fetch accounts only if not provided via props and dialog is opened
   useEffect(() => {
-    if (open) {
+    if (open && !propAccounts) {
       loadAccounts();
     }
-  }, [open]);
+  }, [open, propAccounts]);
+
+  // Initialize selected account when dialog opens
+  useEffect(() => {
+    if (open && selectedAccountId && accounts.length > 0) {
+      const account = findAccountById(accounts, selectedAccountId);
+      if (account) {
+        setSelectedAccount(account);
+      }
+    }
+  }, [open, selectedAccountId, accounts]);
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -58,12 +73,23 @@ export function AccountSelector({
       // Fetch from API
       const response = await fetch('/api/v1/accounts/tree');
       const data = await response.json();
-      setAccounts(data.data);
+      setInternalAccounts(data.data);
     } catch (error) {
       console.error('Failed to load accounts:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const findAccountById = (accounts: Account[], id: string): Account | null => {
+    for (const account of accounts) {
+      if (account.id === id) return account;
+      if (account.children) {
+        const found = findAccountById(account.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   const toggleFolder = (accountId: string) => {
